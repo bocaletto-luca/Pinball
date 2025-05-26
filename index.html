@@ -11,7 +11,7 @@
       margin: 0;
       padding: 0;
     }
-    /* Neon 80's style background */
+    /* Neon 80's inspired background */
     body {
       font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
       background: linear-gradient(135deg, #000428, #004e92);
@@ -129,7 +129,7 @@
   <!-- GAME CONTAINER -->
   <div id="game-container"></div>
   
-  <!-- MESSAGE AREA (for extra feedback) -->
+  <!-- OPTIONAL MESSAGE AREA -->
   <div id="message" style="text-align:center; margin-top: 5px;"></div>
   
   <!-- FOOTER -->
@@ -144,13 +144,13 @@
       <h2>How to Play Pinball</h2>
       <p>
         <strong>Flippers:</strong> Use the Left and Right arrow keys to operate the flippers. Their motion is limited to a 90° swing from their resting positions.<br><br>
-        <strong>Plunger:</strong> Hold down the Space key to charge the plunger. On release, the ball launches upward with force proportional to the charge time.<br><br>
-        <strong>Bumpers:</strong> Hitting bumpers increases your score and they flash when struck; if you press Space while the ball is on a bumper, you get an extra boost!<br><br>
-        <strong>Ramps:</strong> Two semicircular (half‑moon) ramp sensors are placed at the top. Entering one teleports the ball to the opposite side (left to right or vice versa).<br><br>
-        <strong>Hole:</strong> A black hole trap is positioned away from the bumpers; if the ball falls in, it’s trapped for 3 seconds and then released forcefully by a spring mechanism.<br><br>
-        <strong>Channel:</strong> The ball spawns within a dedicated channel on the extreme right and then enters the game at the top‑right—ensuring controlled entry and that it won’t re‑enter the channel unintentionally.<br><br>
-        <strong>Lives & Score:</strong> You have 3 balls per game. When all are lost, the game is over.<br><br>
-        Enjoy the upgraded neon‑arcade experience!
+        <strong>Plunger:</strong> Hold down the Space key to charge the plunger. When you release Space, the ball is launched upward with force proportional to the charge time.<br><br>
+        <strong>Bumpers:</strong> Striking a bumper lights it up and increases your score. Press Space as the ball contacts a bumper to give it an extra boost!<br><br>
+        <strong>Ramps:</strong> Two semicircular (half‑moon) ramp sensors are located at the top left and right. Entering one teleports the ball to the opposite ramp exit.<br><br>
+        <strong>Black Hole:</strong> If the ball falls into the black hole (now positioned away from the bumpers), it is trapped for 3 seconds before a spring mechanism launches it upward.<br><br>
+        <strong>Ball Channel:</strong> The ball spawns in a dedicated right‑channel and enters play at the top‑right, isolated from the right diagonal wall.<br><br>
+        <strong>Lives & Score:</strong> You have 3 balls per game. When all are lost, the game ends.<br><br>
+        Enjoy the retro neon‑arcade experience!
       </p>
     </div>
   </div>
@@ -158,7 +158,7 @@
   <!-- Matter.js Library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
   <script>
-    // ----- Aliases for Matter.js modules -----
+    // ----- Matter.js Aliases -----
     const Engine = Matter.Engine,
           Render = Matter.Render,
           Runner = Matter.Runner,
@@ -179,19 +179,18 @@
     let plungerCharge = 0;
     let plungerStartTime = 0;
     
-    // Sound effects (replace URLs with your own if desired)
+    // ----- Sound Effects (replace URLs if desired) -----
     const bumperSound = new Audio('https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg');
     const springSound = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
     const teleportSound = new Audio('https://actions.google.com/sounds/v1/cartoon/pop.ogg');
     
-    // Canvas dimensions
+    // ----- Canvas Dimensions -----
     const canvasWidth = 600,
           canvasHeight = 800;
     
-    // Utility: generate vertices approximating a semicircle (half‑moon)
+    // ----- Helper: Create Semicircular Vertices (for half‑moon ramp sensors) -----
     function createSemicircleVertices(radius, segments) {
       const vertices = [];
-      // Generate an arc from 0 to PI
       for (let i = 0; i <= segments; i++) {
         let angle = Math.PI * (i / segments);
         vertices.push({ x: radius * Math.cos(angle), y: radius * Math.sin(angle) });
@@ -200,7 +199,7 @@
       return vertices;
     }
     
-    // ----- Clear any previous game instance -----
+    // ----- Clear Previous Game Instance -----
     function clearPreviousGame() {
       if (engine) {
         Runner.stop(runner);
@@ -215,7 +214,6 @@
     // ----- Initialize the Game -----
     function initGame() {
       clearPreviousGame();
-      
       score = 0;
       ballCount = 3;
       isBallLaunched = false;
@@ -234,7 +232,7 @@
           width: canvasWidth,
           height: canvasHeight,
           wireframes: false,
-          background: "#0d0d20"  // Dark neon background
+          background: "#0d0d20"
         }
       });
       Render.run(render);
@@ -249,53 +247,56 @@
       let leftWall = Bodies.rectangle(-25, canvasHeight / 2, 50, canvasHeight, wallOptions);
       let rightWall = Bodies.rectangle(canvasWidth + 25, canvasHeight / 2, 50, canvasHeight, wallOptions);
       
-      // ----- Diagonals: Thin channel walls from the cabinet edge to the green container -----
-      // Adjusted so that they extend from near the left/right wall (edge) to the side (green container)
-      let leftDiagonal = Bodies.rectangle(50, 750, 10, 150, {
+      // ----- Diagonal Channel Walls (refined placement) -----
+      // Left diagonal: from near the left wall to the left flipper pivot.
+      // Pivot of left flipper (hinge) is at (140,750), so we set the left diagonal starting at (50,700)
+      let leftDiagonal = Bodies.rectangle(95, 725, 10, 130, {
         isStatic: true,
-        angle: Math.PI / 4,
+        angle: Math.atan2(750 - 700, 140 - 50),  // approximate angle from (50,700) to (140,750)
         render: { fillStyle: "#ff00ff" }
       });
-      let rightDiagonal = Bodies.rectangle(550, 750, 10, 150, {
+      // Right diagonal: mirror for the right side; goes from (550,700) to the right flipper pivot at (460,750)
+      let rightDiagonal = Bodies.rectangle(505, 725, 10, 130, {
         isStatic: true,
-        angle: -Math.PI / 4,
+        angle: -Math.atan2(750 - 700, 550 - 460), // negative angle mirror
         render: { fillStyle: "#ff00ff" }
       });
       
-      // ----- Additional Side Walls for the Channel -----
-      // A green vertical barrier to form a channel on the right.
-      let rightChannel = Bodies.rectangle(580, 760, 20, 80, { isStatic: true, render: { fillStyle: "#00ff00" } });
+      // ----- Right Channel Wall: isolate ball spawn in the right channel -----
+      // Place a vertical barrier on the far right.
+      let rightChannel = Bodies.rectangle(590, 760, 20, 80, { isStatic: true, render: { fillStyle: "#00ff00" } });
       
-      // ----- Black Hole: repositioned away from bumpers -----
-      let blackHole = Bodies.circle(300, 650, 40, { 
-        isStatic: true, 
-        isSensor: true, 
-        render: { fillStyle: "#000", strokeStyle: "#ffffff", lineWidth: 3 } 
+      // ----- Black Hole Sensor: reposition away from bumpers (centered lower) -----
+      let blackHole = Bodies.circle(300, 600, 40, {
+        isStatic: true,
+        isSensor: true,
+        render: { fillStyle: "#000", strokeStyle: "#ffffff", lineWidth: 3 }
       });
       
-      // ----- Create Semicircular Ramp Sensors (Half‑Moon Ramps) -----
-      // Left ramp sensor centered at (100, 120)
-      let leftRampVertices = createSemicircleVertices(60, 10);
-      leftRampSensor = Bodies.fromVertices(100, 120, [leftRampVertices], { 
-        isStatic: true, 
-        isSensor: true, 
-        label: "leftRamp", 
-        render: { fillStyle: "#ff9900" } 
+      // ----- Semicircular Ramp Sensors (Half‑Moon Ramps) -----
+      // Left ramp sensor at top left; centered at (100,120)
+      let leftRampVertices = createSemicircleVertices(60, 16);
+      leftRampSensor = Bodies.fromVertices(100, 120, [leftRampVertices], {
+        isStatic: true,
+        isSensor: true,
+        label: "leftRamp",
+        render: { fillStyle: "#ff9900" }
       }, true);
-      // Right ramp sensor centered at (500, 120)
-      let rightRampVertices = createSemicircleVertices(60, 10);
-      rightRampSensor = Bodies.fromVertices(500, 120, [rightRampVertices], { 
-        isStatic: true, 
-        isSensor: true, 
-        label: "rightRamp", 
-        render: { fillStyle: "#ff9900" } 
+      // Right ramp sensor at top right; centered at (500,120)
+      let rightRampVertices = createSemicircleVertices(60, 16);
+      rightRampSensor = Bodies.fromVertices(500, 120, [rightRampVertices], {
+        isStatic: true,
+        isSensor: true,
+        label: "rightRamp",
+        render: { fillStyle: "#ff9900" }
       }, true);
       
-      // ----- Composite addition of boundaries and sensors -----
-      Composite.add(world, [floor, ceiling, leftWall, rightWall, leftDiagonal, rightDiagonal, rightChannel, blackHole,
+      // ----- Composite Addition of Boundaries & Sensors -----
+      Composite.add(world, [floor, ceiling, leftWall, rightWall,
+                             leftDiagonal, rightDiagonal, rightChannel, blackHole,
                              leftRampSensor, rightRampSensor]);
       
-      // ----- Create Bumpers (that flash when hit) -----
+      // ----- Create Bumpers (flash and award points) -----
       const bumperOptions = {
         isStatic: true,
         restitution: 1.2,
@@ -307,14 +308,13 @@
       bumpers = [bumper1, bumper2, bumper3];
       Composite.add(world, bumpers);
       
-      // ----- Create Flippers (with a gap between them) -----
-      // Left flipper (resting angle: -0.25 rad)
+      // ----- Create Flippers with a clear central gap -----
+      // Left flipper pivot will be around (140,750) and right flipper around (460,750).
       leftFlipper = Bodies.rectangle(200, 750, 120, 20, {
         angle: -0.25,
         density: 0.002,
         render: { fillStyle: "#ff00ff" }
       });
-      // Right flipper (resting angle: 0.25 rad)
       rightFlipper = Bodies.rectangle(400, 750, 120, 20, {
         angle: 0.25,
         density: 0.002,
@@ -322,7 +322,7 @@
       });
       Composite.add(world, [leftFlipper, rightFlipper]);
       
-      // Constrain flippers to pivot points with hinges, and allow at most 90° movement from rest.
+      // Constrain flippers with hinges (ensuring a max 90° swing from rest)
       let leftHinge = Constraint.create({
         pointA: { x: 140, y: 750 },
         bodyB: leftFlipper,
@@ -339,18 +339,17 @@
       });
       Composite.add(world, [leftHinge, rightHinge]);
       
-      // ----- Create the Ball in the Channel on the Right -----
-      // Positioned inside the channel so that it has a clear, isolated path
-      ball = Bodies.circle(550, 760, 15, {
+      // ----- Create the Ball in the Right Channel -----
+      // Ball is spawned inside the channel on the far right (shifted to x = 570)
+      ball = Bodies.circle(570, 760, 15, {
         restitution: 0.9,
         density: 0.004,
         render: { fillStyle: "#ffffff" }
       });
       Composite.add(world, ball);
       
-      // ----- Collision Detection & Events -----
-      
-      // Bumpers: Increase score, flash color, and play sound
+      // ----- Collision Events -----
+      // Bumpers: Increase score, flash color, play sound, and extra boost if Space is pressed.
       Events.on(engine, 'collisionStart', function(event) {
         event.pairs.forEach(pair => {
           if ((pair.bodyA === ball && bumpers.includes(pair.bodyB)) ||
@@ -360,12 +359,9 @@
             bumperSound.currentTime = 0;
             bumperSound.play();
             let bumper = bumpers.includes(pair.bodyA) ? pair.bodyA : pair.bodyB;
-            let originalColor = bumper.render.fillStyle;
+            let orig = bumper.render.fillStyle;
             bumper.render.fillStyle = "#ffffff";
-            setTimeout(() => {
-              bumper.render.fillStyle = originalColor;
-            }, 150);
-            // Extra boost if Space is pressed at collision moment
+            setTimeout(() => { bumper.render.fillStyle = orig; }, 150);
             if (plungerCharge > 0) {
               Body.applyForce(ball, ball.position, { x: 0, y: -0.05 });
             }
@@ -373,7 +369,7 @@
         });
       });
       
-      // Ramp Sensors (Semicircular): Teleport ball between ramps
+      // Ramp Sensors: Teleport ball from one ramp to the opposite.
       Events.on(engine, 'collisionStart', function(event) {
         event.pairs.forEach(pair => {
           if ((pair.bodyA === ball && pair.bodyB.label === "leftRamp") ||
@@ -393,7 +389,7 @@
         });
       });
       
-      // Black Hole: Traps the ball for 3 seconds then launches it upward
+      // Black Hole: Trap the ball for 3 seconds then launch it upward.
       Events.on(engine, 'collisionStart', function(event) {
         event.pairs.forEach(pair => {
           if ((pair.bodyA === ball && pair.bodyB === blackHole) ||
@@ -413,7 +409,7 @@
         });
       });
       
-      // If the ball falls below the game area, decrement lives and reset if possible.
+      // Life Loss: If the ball falls below the playfield, lose one life and reset the ball.
       Events.on(engine, 'afterUpdate', function() {
         if (ball.position.y > canvasHeight + 30) {
           ballCount--;
@@ -427,23 +423,21 @@
         }
       });
       
-      // ----- Clamp Flipper Rotation to a Maximum of 90° from Rest -----
-      // Left flipper rests at -0.25 rad; clamp between -0.25 - 1.57 = -1.82 and -0.25 + 1.57 = 1.32.
-      // Right flipper rests at 0.25 rad; clamp between 0.25 - 1.57 = -1.32 and 0.25 + 1.57 = 1.82.
+      // Constrain flipper rotation to at most 90° from their rest positions.
       Events.on(engine, 'beforeUpdate', function() {
         if (leftFlipper.angle > 1.32) Body.setAngle(leftFlipper, 1.32);
-        if (leftFlipper.angle < -1.82) Body.setAngle(leftFlipper, -1.82);
+        if (leftFlipper.angle < -1.32) Body.setAngle(leftFlipper, -1.32);
         if (rightFlipper.angle < -1.32) Body.setAngle(rightFlipper, -1.32);
-        if (rightFlipper.angle > 1.82) Body.setAngle(rightFlipper, 1.82);
+        if (rightFlipper.angle > 1.32) Body.setAngle(rightFlipper, 1.32);
       });
       
-      // Clear plunger flags for the new game.
+      // Clear plunger flags.
       isBallLaunched = false;
       plungerCharge = 0;
       document.getElementById("message").textContent = "";
     }
     
-    // ----- Flipper Controls via Left/Right Arrow Keys -----
+    // ----- Flipper Controls (Left/Right Arrow Keys) -----
     function handleKeyDown(e) {
       if (e.code === "ArrowLeft") {
         Body.setAngularVelocity(leftFlipper, -2);
@@ -461,7 +455,7 @@
       }
     }
     
-    // ----- Plunger Mechanism (Space key to charge and release) -----
+    // ----- Plunger Mechanism (Space Key) -----
     function handleSpaceKeyDown(e) {
       if (e.code === "Space" && !isBallLaunched && !isBallTrapped) {
         if (plungerCharge === 0) {
@@ -481,10 +475,10 @@
       }
     }
     
-    // ----- Reset the Ball to the Right Channel if Lost -----
+    // ----- Reset Ball to the Right Channel if Lost -----
     function resetBall() {
       Composite.remove(world, ball);
-      ball = Bodies.circle(550, 760, 15, {
+      ball = Bodies.circle(570, 760, 15, {
         restitution: 0.9,
         density: 0.004,
         render: { fillStyle: "#ffffff" }
@@ -493,7 +487,7 @@
       isBallLaunched = false;
     }
     
-    // ----- New Game Setup: Clear previous table and start fresh -----
+    // ----- New Game Setup: Clear previous game and initialize -----
     function newGameSetup() {
       score = 0;
       ballCount = 3;
@@ -512,7 +506,7 @@
       document.addEventListener('keyup', handleSpaceKeyUp);
     }
     
-    // ----- Start the Game on Page Load and Bind New Game Button -----
+    // ----- Start the Game on Page Load & Bind New Game Button -----
     newGameSetup();
     document.getElementById("newGameBtn").onclick = newGameSetup;
     
