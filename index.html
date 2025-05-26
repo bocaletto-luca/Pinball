@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pinball – Definitive Release</title>
+  <style>
+    /* ========== RESET & GLOBAL STYLES ========== */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    /* Neon 80's style background */
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #000428, #004e92);
+      color: #e0e0e0;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    header {
+      text-align: center;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    header h1 {
+      font-size: 2em;
+      margin-bottom: 10px;
+      text-shadow: 0 0 8px #ff00ff;
+    }
+    #controls {
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 8px 12px;
+      margin: 4px;
+      font-size: 1em;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background-color: #28a745;
+      color: #fff;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #218838;
+    }
+    #score, #lives {
+      font-size: 1.2em;
+      margin-top: 5px;
+      text-shadow: 0 0 5px #00ffff;
+    }
+    /* ========== GAME CONTAINER ========== */
+    #game-container {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      /* A radial gradient for a neon pinball table feel */
+      background: radial-gradient(circle, #0d0d20, #000028 80%);
+    }
+    /* ========== FOOTER ========== */
+    footer {
+      text-align: center;
+      padding: 10px;
+      background-color: #1f1f1f;
+      font-size: 0.9em;
+      color: #ccc;
+    }
+    /* ========== HELP MODAL ========== */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 10000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.8);
+      padding: 20px;
+    }
+    .modal-content {
+      background-color: #2a2a2a;
+      margin: 10% auto;
+      padding: 20px;
+      border: 2px solid #888;
+      width: 90%;
+      max-width: 500px;
+      border-radius: 8px;
+      color: #e0e0e0;
+      text-align: left;
+    }
+    .close {
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+      color: #ccc;
+    }
+    .close:hover, .close:focus {
+      color: #fff;
+    }
+    /* ========== RESPONSIVE STYLES ========== */
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.5em; }
+      #controls button { font-size: 0.9em; padding: 6px 10px; }
+      #score, #lives { font-size: 1em; }
+    }
+  </style>
+</head>
+<body>
+  <!-- HEADER -->
+  <header>
+    <h1>Pinball – Definitive Release</h1>
+    <div id="controls">
+      <button id="newGameBtn">New Game</button>
+      <button id="helpBtn">Help</button>
+    </div>
+    <div id="score">Score: 0</div>
+    <div id="lives">Lives: 3</div>
+  </header>
+  
+  <!-- GAME CONTAINER -->
+  <div id="game-container"></div>
+  
+  <!-- MESSAGE AREA (for extra feedback) -->
+  <div id="message" style="text-align:center; margin-top: 5px;"></div>
+  
+  <!-- FOOTER -->
+  <footer>
+    © 2025 Bocaletto Luca
+  </footer>
+  
+  <!-- HELP MODAL -->
+  <div id="helpModal" class="modal">
+    <div class="modal-content">
+      <span class="close" id="closeHelp">&times;</span>
+      <h2>How to Play Pinball</h2>
+      <p>
+        <strong>Flippers:</strong> Use the Left and Right arrow keys to operate the flippers. Their motion is limited to a 90° swing from their resting positions.<br><br>
+        <strong>Plunger:</strong> Hold down the Space key to charge the plunger. On release, the ball launches upward with force proportional to the charge time.<br><br>
+        <strong>Bumpers:</strong> Hitting bumpers increases your score and they flash when struck; if you press Space while the ball is on a bumper, you get an extra boost!<br><br>
+        <strong>Ramps:</strong> Two semicircular (half‑moon) ramp sensors are placed at the top. Entering one teleports the ball to the opposite side (left to right or vice versa).<br><br>
+        <strong>Hole:</strong> A black hole trap is positioned away from the bumpers; if the ball falls in, it’s trapped for 3 seconds and then released forcefully by a spring mechanism.<br><br>
+        <strong>Channel:</strong> The ball spawns within a dedicated channel on the extreme right and then enters the game at the top‑right—ensuring controlled entry and that it won’t re‑enter the channel unintentionally.<br><br>
+        <strong>Lives & Score:</strong> You have 3 balls per game. When all are lost, the game is over.<br><br>
+        Enjoy the upgraded neon‑arcade experience!
+      </p>
+    </div>
+  </div>
+  
+  <!-- Matter.js Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <script>
+    // ----- Aliases for Matter.js modules -----
+    const Engine = Matter.Engine,
+          Render = Matter.Render,
+          Runner = Matter.Runner,
+          Bodies = Matter.Bodies,
+          Composite = Matter.Composite,
+          Constraint = Matter.Constraint,
+          Body = Matter.Body,
+          Events = Matter.Events;
+    
+    let engine, world, render, runner;
+    let ball, leftFlipper, rightFlipper;
+    let bumpers = [];
+    let leftRampSensor, rightRampSensor;
+    let score = 0;
+    let ballCount = 3;
+    let isBallLaunched = false;
+    let isBallTrapped = false;
+    let plungerCharge = 0;
+    let plungerStartTime = 0;
+    
+    // Sound effects (replace URLs with your own if desired)
+    const bumperSound = new Audio('https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg');
+    const springSound = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+    const teleportSound = new Audio('https://actions.google.com/sounds/v1/cartoon/pop.ogg');
+    
+    // Canvas dimensions
+    const canvasWidth = 600,
+          canvasHeight = 800;
+    
+    // Utility: generate vertices approximating a semicircle (half‑moon)
+    function createSemicircleVertices(radius, segments) {
+      const vertices = [];
+      // Generate an arc from 0 to PI
+      for (let i = 0; i <= segments; i++) {
+        let angle = Math.PI * (i / segments);
+        vertices.push({ x: radius * Math.cos(angle), y: radius * Math.sin(angle) });
+      }
+      vertices.push({ x: 0, y: 0 });
+      return vertices;
+    }
+    
+    // ----- Clear any previous game instance -----
+    function clearPreviousGame() {
+      if (engine) {
+        Runner.stop(runner);
+        Render.stop(render);
+        Composite.clear(world, false);
+        Engine.clear(engine);
+        render.canvas.remove();
+        render.textures = {};
+      }
+    }
+    
+    // ----- Initialize the Game -----
+    function initGame() {
+      clearPreviousGame();
+      
+      score = 0;
+      ballCount = 3;
+      isBallLaunched = false;
+      isBallTrapped = false;
+      plungerCharge = 0;
+      document.getElementById("score").textContent = "Score: " + score;
+      document.getElementById("lives").textContent = "Lives: " + ballCount;
+      
+      engine = Engine.create();
+      world = engine.world;
+      
+      render = Render.create({
+        element: document.getElementById('game-container'),
+        engine: engine,
+        options: {
+          width: canvasWidth,
+          height: canvasHeight,
+          wireframes: false,
+          background: "#0d0d20"  // Dark neon background
+        }
+      });
+      Render.run(render);
+      
+      runner = Runner.create();
+      Runner.run(runner, engine);
+      
+      // ----- Create Boundaries (Neon Walls) -----
+      const wallOptions = { isStatic: true, render: { fillStyle: "#00ffff" } };
+      let floor = Bodies.rectangle(canvasWidth / 2, canvasHeight + 25, canvasWidth, 50, wallOptions);
+      let ceiling = Bodies.rectangle(canvasWidth / 2, -25, canvasWidth, 50, wallOptions);
+      let leftWall = Bodies.rectangle(-25, canvasHeight / 2, 50, canvasHeight, wallOptions);
+      let rightWall = Bodies.rectangle(canvasWidth + 25, canvasHeight / 2, 50, canvasHeight, wallOptions);
+      
+      // ----- Diagonals: Thin channel walls from the cabinet edge to the green container -----
+      // Adjusted so that they extend from near the left/right wall (edge) to the side (green container)
+      let leftDiagonal = Bodies.rectangle(50, 750, 10, 150, {
+        isStatic: true,
+        angle: Math.PI / 4,
+        render: { fillStyle: "#ff00ff" }
+      });
+      let rightDiagonal = Bodies.rectangle(550, 750, 10, 150, {
+        isStatic: true,
+        angle: -Math.PI / 4,
+        render: { fillStyle: "#ff00ff" }
+      });
+      
+      // ----- Additional Side Walls for the Channel -----
+      // A green vertical barrier to form a channel on the right.
+      let rightChannel = Bodies.rectangle(580, 760, 20, 80, { isStatic: true, render: { fillStyle: "#00ff00" } });
+      
+      // ----- Black Hole: repositioned away from bumpers -----
+      let blackHole = Bodies.circle(300, 650, 40, { 
+        isStatic: true, 
+        isSensor: true, 
+        render: { fillStyle: "#000", strokeStyle: "#ffffff", lineWidth: 3 } 
+      });
+      
+      // ----- Create Semicircular Ramp Sensors (Half‑Moon Ramps) -----
+      // Left ramp sensor centered at (100, 120)
+      let leftRampVertices = createSemicircleVertices(60, 10);
+      leftRampSensor = Bodies.fromVertices(100, 120, [leftRampVertices], { 
+        isStatic: true, 
+        isSensor: true, 
+        label: "leftRamp", 
+        render: { fillStyle: "#ff9900" } 
+      }, true);
+      // Right ramp sensor centered at (500, 120)
+      let rightRampVertices = createSemicircleVertices(60, 10);
+      rightRampSensor = Bodies.fromVertices(500, 120, [rightRampVertices], { 
+        isStatic: true, 
+        isSensor: true, 
+        label: "rightRamp", 
+        render: { fillStyle: "#ff9900" } 
+      }, true);
+      
+      // ----- Composite addition of boundaries and sensors -----
+      Composite.add(world, [floor, ceiling, leftWall, rightWall, leftDiagonal, rightDiagonal, rightChannel, blackHole,
+                             leftRampSensor, rightRampSensor]);
+      
+      // ----- Create Bumpers (that flash when hit) -----
+      const bumperOptions = {
+        isStatic: true,
+        restitution: 1.2,
+        render: { fillStyle: "#ffaa00" }
+      };
+      let bumper1 = Bodies.circle(200, 300, 30, Object.assign({}, bumperOptions));
+      let bumper2 = Bodies.circle(400, 300, 30, Object.assign({}, bumperOptions));
+      let bumper3 = Bodies.circle(300, 450, 30, Object.assign({}, bumperOptions));
+      bumpers = [bumper1, bumper2, bumper3];
+      Composite.add(world, bumpers);
+      
+      // ----- Create Flippers (with a gap between them) -----
+      // Left flipper (resting angle: -0.25 rad)
+      leftFlipper = Bodies.rectangle(200, 750, 120, 20, {
+        angle: -0.25,
+        density: 0.002,
+        render: { fillStyle: "#ff00ff" }
+      });
+      // Right flipper (resting angle: 0.25 rad)
+      rightFlipper = Bodies.rectangle(400, 750, 120, 20, {
+        angle: 0.25,
+        density: 0.002,
+        render: { fillStyle: "#ff00ff" }
+      });
+      Composite.add(world, [leftFlipper, rightFlipper]);
+      
+      // Constrain flippers to pivot points with hinges, and allow at most 90° movement from rest.
+      let leftHinge = Constraint.create({
+        pointA: { x: 140, y: 750 },
+        bodyB: leftFlipper,
+        pointB: { x: -60, y: 0 },
+        stiffness: 1,
+        length: 0
+      });
+      let rightHinge = Constraint.create({
+        pointA: { x: 460, y: 750 },
+        bodyB: rightFlipper,
+        pointB: { x: 60, y: 0 },
+        stiffness: 1,
+        length: 0
+      });
+      Composite.add(world, [leftHinge, rightHinge]);
+      
+      // ----- Create the Ball in the Channel on the Right -----
+      // Positioned inside the channel so that it has a clear, isolated path
+      ball = Bodies.circle(550, 760, 15, {
+        restitution: 0.9,
+        density: 0.004,
+        render: { fillStyle: "#ffffff" }
+      });
+      Composite.add(world, ball);
+      
+      // ----- Collision Detection & Events -----
+      
+      // Bumpers: Increase score, flash color, and play sound
+      Events.on(engine, 'collisionStart', function(event) {
+        event.pairs.forEach(pair => {
+          if ((pair.bodyA === ball && bumpers.includes(pair.bodyB)) ||
+              (pair.bodyB === ball && bumpers.includes(pair.bodyA))) {
+            score += 10;
+            document.getElementById("score").textContent = "Score: " + score;
+            bumperSound.currentTime = 0;
+            bumperSound.play();
+            let bumper = bumpers.includes(pair.bodyA) ? pair.bodyA : pair.bodyB;
+            let originalColor = bumper.render.fillStyle;
+            bumper.render.fillStyle = "#ffffff";
+            setTimeout(() => {
+              bumper.render.fillStyle = originalColor;
+            }, 150);
+            // Extra boost if Space is pressed at collision moment
+            if (plungerCharge > 0) {
+              Body.applyForce(ball, ball.position, { x: 0, y: -0.05 });
+            }
+          }
+        });
+      });
+      
+      // Ramp Sensors (Semicircular): Teleport ball between ramps
+      Events.on(engine, 'collisionStart', function(event) {
+        event.pairs.forEach(pair => {
+          if ((pair.bodyA === ball && pair.bodyB.label === "leftRamp") ||
+              (pair.bodyB === ball && pair.bodyA.label === "leftRamp")) {
+            teleportSound.currentTime = 0;
+            teleportSound.play();
+            Body.setPosition(ball, { x: rightRampSensor.position.x, y: rightRampSensor.position.y + 20 });
+            Body.setVelocity(ball, { x: 0, y: -10 });
+          }
+          if ((pair.bodyA === ball && pair.bodyB.label === "rightRamp") ||
+              (pair.bodyB === ball && pair.bodyA.label === "rightRamp")) {
+            teleportSound.currentTime = 0;
+            teleportSound.play();
+            Body.setPosition(ball, { x: leftRampSensor.position.x, y: leftRampSensor.position.y + 20 });
+            Body.setVelocity(ball, { x: 0, y: -10 });
+          }
+        });
+      });
+      
+      // Black Hole: Traps the ball for 3 seconds then launches it upward
+      Events.on(engine, 'collisionStart', function(event) {
+        event.pairs.forEach(pair => {
+          if ((pair.bodyA === ball && pair.bodyB === blackHole) ||
+              (pair.bodyB === ball && pair.bodyA === blackHole)) {
+            if (!isBallTrapped) {
+              isBallTrapped = true;
+              Body.setStatic(ball, true);
+              setTimeout(() => {
+                Body.setStatic(ball, false);
+                Body.applyForce(ball, ball.position, { x: 0, y: -0.08 });
+                springSound.currentTime = 0;
+                springSound.play();
+                isBallTrapped = false;
+              }, 3000);
+            }
+          }
+        });
+      });
+      
+      // If the ball falls below the game area, decrement lives and reset if possible.
+      Events.on(engine, 'afterUpdate', function() {
+        if (ball.position.y > canvasHeight + 30) {
+          ballCount--;
+          document.getElementById("lives").textContent = "Lives: " + ballCount;
+          if (ballCount > 0) {
+            resetBall();
+          } else {
+            document.getElementById("message").textContent = "Game Over! Final Score: " + score;
+            Runner.stop(runner);
+          }
+        }
+      });
+      
+      // ----- Clamp Flipper Rotation to a Maximum of 90° from Rest -----
+      // Left flipper rests at -0.25 rad; clamp between -0.25 - 1.57 = -1.82 and -0.25 + 1.57 = 1.32.
+      // Right flipper rests at 0.25 rad; clamp between 0.25 - 1.57 = -1.32 and 0.25 + 1.57 = 1.82.
+      Events.on(engine, 'beforeUpdate', function() {
+        if (leftFlipper.angle > 1.32) Body.setAngle(leftFlipper, 1.32);
+        if (leftFlipper.angle < -1.82) Body.setAngle(leftFlipper, -1.82);
+        if (rightFlipper.angle < -1.32) Body.setAngle(rightFlipper, -1.32);
+        if (rightFlipper.angle > 1.82) Body.setAngle(rightFlipper, 1.82);
+      });
+      
+      // Clear plunger flags for the new game.
+      isBallLaunched = false;
+      plungerCharge = 0;
+      document.getElementById("message").textContent = "";
+    }
+    
+    // ----- Flipper Controls via Left/Right Arrow Keys -----
+    function handleKeyDown(e) {
+      if (e.code === "ArrowLeft") {
+        Body.setAngularVelocity(leftFlipper, -2);
+      }
+      if (e.code === "ArrowRight") {
+        Body.setAngularVelocity(rightFlipper, 2);
+      }
+    }
+    function handleKeyUp(e) {
+      if (e.code === "ArrowLeft") {
+        Body.setAngularVelocity(leftFlipper, 2);
+      }
+      if (e.code === "ArrowRight") {
+        Body.setAngularVelocity(rightFlipper, -2);
+      }
+    }
+    
+    // ----- Plunger Mechanism (Space key to charge and release) -----
+    function handleSpaceKeyDown(e) {
+      if (e.code === "Space" && !isBallLaunched && !isBallTrapped) {
+        if (plungerCharge === 0) {
+          plungerStartTime = new Date().getTime();
+        }
+      }
+    }
+    function handleSpaceKeyUp(e) {
+      if (e.code === "Space" && !isBallLaunched && !isBallTrapped) {
+        let chargeTime = (new Date().getTime() - plungerStartTime) / 1000;
+        chargeTime = Math.min(chargeTime, 2);
+        plungerCharge = chargeTime;
+        let forceMagnitude = plungerCharge * 0.04;
+        Body.applyForce(ball, ball.position, { x: 0, y: -forceMagnitude });
+        isBallLaunched = true;
+        plungerCharge = 0;
+      }
+    }
+    
+    // ----- Reset the Ball to the Right Channel if Lost -----
+    function resetBall() {
+      Composite.remove(world, ball);
+      ball = Bodies.circle(550, 760, 15, {
+        restitution: 0.9,
+        density: 0.004,
+        render: { fillStyle: "#ffffff" }
+      });
+      Composite.add(world, ball);
+      isBallLaunched = false;
+    }
+    
+    // ----- New Game Setup: Clear previous table and start fresh -----
+    function newGameSetup() {
+      score = 0;
+      ballCount = 3;
+      document.getElementById("score").textContent = "Score: " + score;
+      document.getElementById("lives").textContent = "Lives: " + ballCount;
+      clearPreviousGame();
+      initGame();
+    }
+    
+    // ----- Bind Global Keyboard Events (only once) -----
+    if (!window.pinballEventsBound) {
+      window.pinballEventsBound = true;
+      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener('keyup', handleKeyUp);
+      document.addEventListener('keydown', handleSpaceKeyDown);
+      document.addEventListener('keyup', handleSpaceKeyUp);
+    }
+    
+    // ----- Start the Game on Page Load and Bind New Game Button -----
+    newGameSetup();
+    document.getElementById("newGameBtn").onclick = newGameSetup;
+    
+    // ----- Help Modal Event Handlers -----
+    document.getElementById("helpBtn").onclick = function() {
+      document.getElementById("helpModal").style.display = "block";
+    };
+    document.getElementById("closeHelp").onclick = function() {
+      document.getElementById("helpModal").style.display = "none";
+    };
+    window.onclick = function(e) {
+      if (e.target === document.getElementById("helpModal")) {
+        document.getElementById("helpModal").style.display = "none";
+      }
+    };
+  </script>
+</body>
+</html>
